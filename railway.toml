@@ -1,24 +1,22 @@
 # Railway service config for the FastAPI API. Deploy this repo as one
-# Railway service using this file (root Dockerfile).
+# Railway service using this file (root Dockerfile), then add Postgres,
+# Qdrant, and LiteLLM as separate services in the same project (Postgres:
+# Railway's own plugin; Qdrant + LiteLLM: "Deploy from Docker image" with
+# qdrant/qdrant:latest and ghcr.io/berriai/litellm:main-stable respectively).
 #
-# Everything runs on Railway — no Vercel. The frontend (frontend/Dockerfile)
-# is a second service in the same Railway project; it talks to this one over
-# Railway's private network (http://<this-service-name>.railway.internal:8000),
-# so the API is never exposed publicly — only the frontend needs a domain.
-#
-# Services to create in this Railway project:
-#   1. api       — this file, root Dockerfile
-#   2. frontend  — root directory "frontend", frontend/Dockerfile
-#   3. postgres  — Railway's Postgres plugin (one click, no Dockerfile needed)
-#   4. qdrant    — "Deploy from Docker image": qdrant/qdrant:latest, port 6333, with a volume on /qdrant/storage
-#   5. litellm   — "Deploy from Docker image": ghcr.io/berriai/litellm:main-stable (not wired into the app yet, see infra/litellm/config.yaml)
+# The frontend lives on Vercel, a different platform — so unlike an
+# all-Railway setup, this API needs a PUBLIC domain for Vercel to reach it
+# (Railway's free *.up.railway.app works fine to start; Settings > Networking
+# > Generate Domain on this service). Internal Railway networking
+# (*.railway.internal) only works between services inside the same Railway
+# project, so it applies to api <-> qdrant/litellm, not api <-> Vercel.
 #
 # Required env vars on the api service:
 #   GEMINI_API_KEY   — same key used locally
-#   QDRANT_URL       — http://<qdrant-service-name>.railway.internal:6333
+#   QDRANT_URL       — the Qdrant service's internal Railway URL (http://<service>.railway.internal:6333)
 #
-# Required env var on the frontend service:
-#   RAG_API_URL      — http://<api-service-name>.railway.internal:8000
+# Required env var on the Vercel project:
+#   RAG_API_URL      — this service's public Railway domain
 #
 # After the qdrant service is up, run the ingestion scripts once against it
 # (scripts/ingest*.py with QDRANT_URL pointed at the deployed instance) to

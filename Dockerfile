@@ -14,11 +14,15 @@ RUN pip install --no-cache-dir -r requirements-prod.txt
 COPY app ./app
 
 ENV PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
 
 EXPOSE 8000
 
+# Railway assigns PORT dynamically and healthchecks whatever port that is —
+# a container listening on a different, hardcoded port fails the network
+# healthcheck even though the app itself is running fine.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD curl -f http://127.0.0.1:8000/health || exit 1
+    CMD curl -f http://127.0.0.1:${PORT}/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

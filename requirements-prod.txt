@@ -1,0 +1,10 @@
+# Runtime dependencies for the FastAPI API only (serving /ask + /health).
+# Ingestion scripts, Gradio, and Python-3.9 compatibility shims from
+# requirements.txt aren't needed here — the container runs Python 3.12.
+fastapi==0.128.8
+uvicorn[standard]==0.39.0
+google-genai==1.47.0
+qdrant-client==1.16.1
+rank-bm25==0.2.2
+python-dotenv==1.2.1
+requests==2.32.5

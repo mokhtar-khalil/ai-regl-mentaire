@@ -1,0 +1,16 @@
+.venv
+node_modules
+frontend
+data
+infra/ocr_cache
+infra/qdrant-local
+infra/bm25_index.pkl
+scripts
+gradio_app.py
+flagged
+.git
+.env
+.env.local
+*.pyc
+__pycache__
+.DS_Store

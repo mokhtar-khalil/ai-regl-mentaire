@@ -1,0 +1,13 @@
+.DS_Store
+.env
+__pycache__/
+*.pyc
+.venv/
+data/
+flagged/
+
+# Local-only index state — rebuilt by ingestion scripts / from Qdrant, not source
+infra/qdrant-local/
+infra/bm25_index.pkl
+infra/ocr_cache/
+

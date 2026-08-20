@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f4f6f4;
+  --surface: #ffffff;
+  --surface-user: #eaf3f1;
+  --ink: #16212b;
+  --ink-soft: #51606b;
+  --ink-faint: #8994a0;
+  --accent: #1e6e63;
+  --accent-ink: #0f3e38;
+  --accent-soft: #dceae6;
+  --line: #dde2de;
+  --danger: #b3413a;
+  --danger-soft: #f6e5e3;
+
+  --font-display: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-public-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-user: var(--surface-user);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-line: var(--line);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1315;
+    --surface: #161d20;
+    --surface-user: #16302b;
+    --ink: #e7ece9;
+    --ink-soft: #9aa7a6;
+    --ink-faint: #66716f;
+    --accent: #4fb3a3;
+    --accent-ink: #b7e4da;
+    --accent-soft: #17302b;
+    --line: #263130;
+    --danger: #e08079;
+    --danger-soft: #2e1c1a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0e1315;
+  --surface: #161d20;
+  --surface-user: #16302b;
+  --ink: #e7ece9;
+  --ink-soft: #9aa7a6;
+  --ink-faint: #66716f;
+  --accent: #4fb3a3;
+  --accent-ink: #b7e4da;
+  --accent-soft: #17302b;
+  --line: #263130;
+  --danger: #e08079;
+  --danger-soft: #2e1c1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Chat prose: minimal markdown rendering without pulling in a full lib */
+.chat-prose p {
+  margin: 0 0 0.65em;
+}
+.chat-prose p:last-child {
+  margin-bottom: 0;
+}
+.chat-prose strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.chat-prose ul,
+.chat-prose ol {
+  margin: 0.4em 0 0.65em;
+  padding-inline-start: 1.4em;
+}
+.chat-prose li {
+  margin-bottom: 0.25em;
+}
+.chat-prose em {
+  font-style: italic;
+}

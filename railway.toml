@@ -1,0 +1,35 @@
+# Railway service config for the FastAPI API. Deploy this repo as one
+# Railway service using this file (root Dockerfile).
+#
+# Everything runs on Railway — no Vercel. The frontend (frontend/Dockerfile)
+# is a second service in the same Railway project; it talks to this one over
+# Railway's private network (http://<this-service-name>.railway.internal:8000),
+# so the API is never exposed publicly — only the frontend needs a domain.
+#
+# Services to create in this Railway project:
+#   1. api       — this file, root Dockerfile
+#   2. frontend  — root directory "frontend", frontend/Dockerfile
+#   3. postgres  — Railway's Postgres plugin (one click, no Dockerfile needed)
+#   4. qdrant    — "Deploy from Docker image": qdrant/qdrant:latest, port 6333, with a volume on /qdrant/storage
+#   5. litellm   — "Deploy from Docker image": ghcr.io/berriai/litellm:main-stable (not wired into the app yet, see infra/litellm/config.yaml)
+#
+# Required env vars on the api service:
+#   GEMINI_API_KEY   — same key used locally
+#   QDRANT_URL       — http://<qdrant-service-name>.railway.internal:6333
+#
+# Required env var on the frontend service:
+#   RAG_API_URL      — http://<api-service-name>.railway.internal:8000
+#
+# After the qdrant service is up, run the ingestion scripts once against it
+# (scripts/ingest*.py with QDRANT_URL pointed at the deployed instance) to
+# populate the index — the API serves queries, it doesn't ingest documents.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -1,0 +1,15 @@
+# Railway service config for the Next.js frontend. Set this service's
+# root directory to "frontend" in the Railway dashboard so it picks up
+# this file and frontend/Dockerfile.
+#
+# Required env var: RAG_API_URL = http://<api-service-name>.railway.internal:8000
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

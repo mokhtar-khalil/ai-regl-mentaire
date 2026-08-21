@@ -1,12 +1,5 @@
-# Without this file, Railway falls back to a default healthcheck timeout
-# that's too short for LiteLLM's first boot: it runs a full Prisma
-# migration pass against the spend-logs DB before the server can respond,
-# which can take several minutes on a fresh database — especially on a
-# shared/slower Postgres instance than local dev. Locally the same image
-# reached "Uvicorn running" in well under a minute; assume Railway's
-# Postgres is meaningfully slower and give it real headroom.
 [deploy]
 healthcheckPath = "/health/liveliness"
-healthcheckTimeout = 600
+healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3

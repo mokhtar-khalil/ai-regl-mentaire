@@ -32,7 +32,11 @@ model_list:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/LITELLM_DATABASE_URL
+  # database_url temporarily disabled — diagnosing a Railway-only hang
+  # (works fine locally against Postgres, hangs silently on Railway with
+  # both private and public DB URLs). Testing whether the proxy boots at
+  # all without a DB dependency, to isolate whether that's really the cause.
+  # database_url: os.environ/LITELLM_DATABASE_URL
   store_model_in_db: false
 
 litellm_settings:

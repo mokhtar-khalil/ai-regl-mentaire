@@ -15,20 +15,13 @@ model_list:
       model: gemini/gemini-embedding-001
       api_key: os.environ/GEMINI_API_KEY
 
-  # OpenAI — kept available for other apps sharing this gateway, or for
-  # this app later if it needs a second provider.
-  - model_name: gpt-4o
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: gpt-4o-mini
-    litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: text-embedding-3-large
-    litellm_params:
-      model: openai/text-embedding-3-large
-      api_key: os.environ/OPENAI_API_KEY
+  # OpenAI models removed for now — they reference os.environ/OPENAI_API_KEY,
+  # which was never confirmed to exist on the Railway litellm-proxy service
+  # (only GEMINI_API_KEY, LITELLM_MASTER_KEY, LITELLM_DATABASE_URL, PORT were).
+  # Locally OPENAI_API_KEY was set (docker-compose passes it from .env), so
+  # this was never actually tested without it — a real candidate for the
+  # silent-hang-on-Railway bug. Add them back with the var confirmed present
+  # once the proxy is verified working on Gemini alone.
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

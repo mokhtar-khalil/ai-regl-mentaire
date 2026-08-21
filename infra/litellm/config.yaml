@@ -35,7 +35,16 @@ model_list:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/LITELLM_DATABASE_URL
+  # database_url disabled: consistently crashes the proxy on Railway (both
+  # internal and public Postgres URLs), while working fine locally — never
+  # isolated further than a suspected ARM64 (local) vs x86_64 (Railway)
+  # Prisma engine binary mismatch (the boot logs warn Prisma can't identify
+  # the "wolfi" base distro and falls back to a guessed engine build).
+  # Means no spend-log persistence / cost tracking for now — revisit
+  # separately (Railway support, a different Postgres addon, or disabling
+  # Prisma's auto-migration and applying the schema another way) without
+  # blocking the app from using the gateway for routing.
+  # database_url: os.environ/LITELLM_DATABASE_URL
   store_model_in_db: false
 
 litellm_settings:

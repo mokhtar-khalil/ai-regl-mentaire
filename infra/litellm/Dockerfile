@@ -6,11 +6,16 @@ FROM ghcr.io/berriai/litellm:main-stable
 
 COPY config.yaml /app/config.yaml
 
-# Same Railway gotcha as the API's own Dockerfile: PORT is assigned
-# dynamically and healthchecked on that port, not a hardcoded one.
-ENV PORT=4000
-# Override the base image's ENTRYPOINT explicitly rather than relying on
-# how it combines with CMD — avoids guessing whether it already wraps
-# `litellm` and would otherwise double up or swallow our args.
-ENTRYPOINT []
-CMD ["sh", "-c", "litellm --config /app/config.yaml --port ${PORT}"]
+# Keep the base image's own ENTRYPOINT (docker/prod_entrypoint.sh) — it
+# does required setup (Prisma migrations for the spend-logs DB, etc.)
+# before starting the server. Overriding it with a bare `litellm ...`
+# command skipped that setup and the container died silently. Only
+# override CMD, the same shape as the base image's own default
+# (["--port", "4000"]), just adding --config.
+#
+# Port is fixed at 4000 (not Railway's dynamic $PORT) because CMD's exec
+# form can't do shell variable expansion, and the entrypoint script's own
+# argument parsing can't be assumed to support it either — set this
+# service's target port to 4000 in Railway's dashboard instead of relying
+# on the container reading $PORT.
+CMD ["--config", "/app/config.yaml", "--port", "4000"]

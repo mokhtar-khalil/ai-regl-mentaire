@@ -1,4 +1,5 @@
 [deploy]
+preDeployCommand = ["/app/.venv/bin/python /app/migrate.py"]
 healthcheckPath = "/health/liveliness"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"

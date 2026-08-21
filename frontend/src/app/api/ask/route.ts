@@ -17,11 +17,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`${API_URL}/ask`, {
+    const upstream = await fetch(`${API_URL}/ask/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: body.question, top_k: body.top_k ?? 7, target_lang: body.target_lang ?? null }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(120_000)]),
     });
 
     if (!upstream.ok) {
@@ -32,8 +32,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await upstream.json();
-    return NextResponse.json(data);
+    if (!upstream.body) {
+      return NextResponse.json({ error: "Le backend n'a retourné aucun flux" }, { status: 502 });
+    }
+
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") || "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: `Impossible de joindre le backend : ${message}` }, { status: 502 });

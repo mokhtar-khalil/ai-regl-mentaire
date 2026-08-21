@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterator
 
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from pydantic_core import from_json
 
 from app.documents import label_for
 from app.query_translate import detect_lang
@@ -55,10 +57,10 @@ class _AnswerPoint(BaseModel):
 
 
 class _StructuredAnswer(BaseModel):
-    summary: str = Field(description="Conclusion directe en deux à quatre phrases")
     summary_source_indices: list[int] = Field(
         description="Numéros des extraits qui prouvent directement le résumé"
     )
+    summary: str = Field(description="Conclusion directe en deux à quatre phrases")
     key_points: list[_AnswerPoint] = Field(
         description="Un à quatre points déterminants, aucun développement hors sujet"
     )
@@ -165,17 +167,162 @@ def _format_answer(
     return "\n\n".join(block for block in blocks if block.strip())
 
 
+def _complete_point(point: object) -> bool:
+    return (
+        isinstance(point, dict)
+        and isinstance(point.get("title"), str)
+        and isinstance(point.get("text"), str)
+        and isinstance(point.get("source_indices"), list)
+    )
+
+
+def _streamable_blocks(
+    partial: dict,
+    *,
+    language: str,
+    chunk_count: int,
+) -> list[str]:
+    """Return the stable, append-only answer blocks available in partial JSON.
+
+    Gemini streams schema-constrained JSON in chunks. ``from_json`` with
+    ``allow_partial`` exposes only complete values, so a block is never shown
+    before both its legal text and typed citations are available.
+    """
+    summary_heading, analysis_heading, caveats_heading = _HEADINGS[language]
+    blocks: list[str] = []
+
+    summary = partial.get("summary")
+    summary_indices = partial.get("summary_source_indices")
+    if isinstance(summary, str) and isinstance(summary_indices, list):
+        blocks.append(
+            f"**{summary_heading}**\n\n"
+            f"{_with_citations(summary, summary_indices, chunk_count)}"
+        )
+    else:
+        return blocks
+
+    key_points = partial.get("key_points")
+    if isinstance(key_points, list):
+        complete_points = [
+            point
+            for point in key_points
+            if _complete_point(point) and _clean_text(point["text"])
+        ][:4]
+        if complete_points:
+            for index, point in enumerate(complete_points):
+                prefix = f"**{analysis_heading}**\n\n" if index == 0 else ""
+                blocks.append(
+                    f"{prefix}- **{_clean_text(point['title']).rstrip('.:')}** — "
+                    f"{_with_citations(point['text'], point['source_indices'], chunk_count)}"
+                )
+
+    caveats = partial.get("caveats")
+    if isinstance(caveats, list):
+        complete_caveats = [
+            point
+            for point in caveats
+            if _complete_point(point) and _clean_text(point["text"])
+        ][:2]
+        if complete_caveats:
+            for index, point in enumerate(complete_caveats):
+                prefix = f"**{caveats_heading}**\n\n" if index == 0 else ""
+                blocks.append(
+                    f"{prefix}- **{_clean_text(point['title']).rstrip('.:')}** — "
+                    f"{_with_citations(point['text'], point['source_indices'], chunk_count)}"
+                )
+
+    return blocks
+
+
+def _generation_request(
+    question: str,
+    chunks: list[dict],
+    target_lang: str | None,
+) -> tuple[genai.Client, str, str, str]:
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    context = _format_context(list(enumerate(chunks, start=1)))
+    prompt = f"Extraits réglementaires :\n\n{context}\n\n---\n\nQuestion : {question}"
+    system_prompt = _SYSTEM_PROMPT.format(
+        language_rule=_LANGUAGE_RULES.get(target_lang, _LANGUAGE_RULES[None])
+    )
+    language = target_lang or detect_lang(question)
+    return client, prompt, system_prompt, language
+
+
+def answer_stream(
+    question: str,
+    chunks: list[dict],
+    target_lang: str | None = None,
+) -> Iterator[tuple[str, str]]:
+    """Stream complete legal blocks, followed by the canonical full answer.
+
+    Events are ``("delta", text)`` and one final ``("done", answer)``.
+    The final answer lets the caller apply canonical citation renumbering even
+    if an SDK chunk boundary delayed an intermediate block.
+    """
+    language = target_lang or detect_lang(question)
+    if not chunks:
+        message = _NO_CHUNKS_MESSAGE.get(language, _NO_CHUNKS_MESSAGE["fr"])
+        yield "delta", message
+        yield "done", message
+        return
+
+    client, prompt, system_prompt, language = _generation_request(
+        question, chunks, target_lang
+    )
+    raw_json = ""
+    emitted_count = 0
+
+    responses = client.models.generate_content_stream(
+        model=os.getenv("GENERATION_MODEL", DEFAULT_GENERATION_MODEL),
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.15,
+            response_mime_type="application/json",
+            response_schema=_StructuredAnswer,
+        ),
+    )
+    for response in responses:
+        raw_json += response.text or ""
+        try:
+            partial = from_json(raw_json, allow_partial=True)
+        except ValueError:
+            continue
+        if not isinstance(partial, dict):
+            continue
+        blocks = _streamable_blocks(
+            partial,
+            language=language,
+            chunk_count=len(chunks),
+        )
+        for block in blocks[emitted_count:]:
+            separator = (
+                ""
+                if emitted_count == 0
+                else ("\n" if block.startswith("-") else "\n\n")
+            )
+            yield "delta", f"{separator}{block}"
+            emitted_count += 1
+
+    generated = _StructuredAnswer.model_validate_json(raw_json)
+    final_answer = _format_answer(
+        generated,
+        language=language,
+        chunk_count=len(chunks),
+    )
+    if emitted_count == 0:
+        yield "delta", final_answer
+    yield "done", final_answer
+
+
 def answer(question: str, chunks: list[dict], target_lang: str | None = None) -> str:
     if not chunks:
         language = target_lang or detect_lang(question)
         return _NO_CHUNKS_MESSAGE.get(language, _NO_CHUNKS_MESSAGE["fr"])
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    numbered = list(enumerate(chunks, start=1))
-    context = _format_context(numbered)
-    prompt = f"Extraits réglementaires :\n\n{context}\n\n---\n\nQuestion : {question}"
-    system_prompt = _SYSTEM_PROMPT.format(
-        language_rule=_LANGUAGE_RULES.get(target_lang, _LANGUAGE_RULES[None])
+    client, prompt, system_prompt, language = _generation_request(
+        question, chunks, target_lang
     )
 
     response = client.models.generate_content(
@@ -192,5 +339,4 @@ def answer(question: str, chunks: list[dict], target_lang: str | None = None) ->
     if not isinstance(generated, _StructuredAnswer):
         generated = _StructuredAnswer.model_validate_json(response.text)
 
-    language = target_lang or detect_lang(question)
     return _format_answer(generated, language=language, chunk_count=len(chunks))

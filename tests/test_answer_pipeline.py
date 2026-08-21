@@ -1,8 +1,15 @@
 import unittest
+from threading import Barrier
+from unittest.mock import patch
 
-from app.generate import _AnswerPoint, _StructuredAnswer, _format_answer
+from app.generate import (
+    _AnswerPoint,
+    _StructuredAnswer,
+    _format_answer,
+    _streamable_blocks,
+)
 from app.index_store import _deduplicate_bilingual_provisions
-from app.main import _renumber_citations
+from app.main import AskRequest, _prepare_chunks, _renumber_citations
 
 
 class AnswerFormattingTests(unittest.TestCase):
@@ -63,6 +70,26 @@ class AnswerFormattingTests(unittest.TestCase):
         self.assertEqual(original_indices, [1, 2])
         self.assertEqual(rendered, "Première règle [1]. Deuxième règle [2].")
 
+    def test_partial_structured_json_exposes_only_complete_legal_blocks(self):
+        blocks = _streamable_blocks(
+            {
+                "summary_source_indices": [3],
+                "summary": "Conclusion directe.",
+                "key_points": [
+                    {"title": "Règle", "text": "Point complet.", "source_indices": [3]},
+                    {"title": "Incomplet"},
+                ],
+            },
+            language="fr",
+            chunk_count=4,
+        )
+
+        self.assertEqual(len(blocks), 2)
+        self.assertIn("Réponse synthétique", blocks[0])
+        self.assertIn("Conclusion directe. [3]", blocks[0])
+        self.assertIn("Analyse juridique", blocks[1])
+        self.assertNotIn("Incomplet", "".join(blocks))
+
 
 class RetrievalDeduplicationTests(unittest.TestCase):
     def test_same_code_article_keeps_query_language_version(self):
@@ -75,6 +102,36 @@ class RetrievalDeduplicationTests(unittest.TestCase):
         retained = _deduplicate_bilingual_provisions(ranked, "ar")
 
         self.assertEqual([hit["id"] for hit in retained], ["ar-2", "ar-12"])
+
+
+class RequestPreparationTests(unittest.TestCase):
+    def test_embedding_and_translation_start_concurrently(self):
+        rendezvous = Barrier(2)
+
+        def fake_embedding(_question):
+            rendezvous.wait(timeout=1)
+            return [0.1, 0.2]
+
+        def fake_translation(_question, _target_lang):
+            rendezvous.wait(timeout=1)
+            return "requête traduite"
+
+        with (
+            patch("app.main.embed_query", side_effect=fake_embedding),
+            patch("app.main.translate_query", side_effect=fake_translation),
+            patch("app.main.hybrid_search", return_value=[{"id": "one"}]) as search,
+        ):
+            chunks, timings = _prepare_chunks(AskRequest(question="Question"))
+
+        self.assertEqual(chunks, [{"id": "one"}])
+        self.assertIn("embedding_ms", timings)
+        self.assertIn("translation_ms", timings)
+        search.assert_called_once_with(
+            "Question",
+            [0.1, 0.2],
+            top_k=7,
+            translated_query="requête traduite",
+        )
 
 
 if __name__ == "__main__":

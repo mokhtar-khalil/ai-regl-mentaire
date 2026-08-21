@@ -55,6 +55,17 @@ def get_qdrant_client() -> QdrantClient:
     return QdrantClient(path=_QDRANT_PATH)
 
 
+def ping_qdrant() -> None:
+    """Make a lightweight remote request so an idle Qdrant stays responsive."""
+    if not os.environ.get("QDRANT_URL"):
+        return
+    client = get_qdrant_client()
+    try:
+        client.get_collection(COLLECTION)
+    finally:
+        client.close()
+
+
 def ensure_collection(client: QdrantClient) -> None:
     if not client.collection_exists(COLLECTION):
         client.create_collection(
@@ -198,7 +209,12 @@ def _deduplicate_bilingual_provisions(ranked: list[dict], query_lang: str) -> li
     return retained
 
 
-def hybrid_search(query: str, query_vector: list[float], top_k: int = 7) -> list[dict]:
+def hybrid_search(
+    query: str,
+    query_vector: list[float],
+    top_k: int = 7,
+    translated_query: str | None = None,
+) -> list[dict]:
     """Reciprocal Rank Fusion of semantic + lexical results.
 
     Seven final candidates preserve enough room for multi-article legal
@@ -217,7 +233,11 @@ def hybrid_search(query: str, query_vector: list[float], top_k: int = 7) -> list
     lexical_lists = [lexical_search(query, top_k=30)]
 
     other_lang = "fr" if detect_lang(query) == "ar" else "ar"
-    translated = translate_query(query, other_lang)
+    translated = (
+        translate_query(query, other_lang)
+        if translated_query is None
+        else translated_query
+    )
     if translated:
         lexical_lists.append(lexical_search(translated, top_k=30))
 

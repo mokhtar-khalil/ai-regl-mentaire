@@ -61,13 +61,16 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           message.error ? "border-danger-soft bg-danger-soft text-danger" : "border-line bg-surface text-ink"
         }`}
       >
-        {message.pending ? (
+        {message.pending && !message.content ? (
           <ThinkingIndicator />
         ) : message.error ? (
           <p>{message.error}</p>
         ) : (
           <>
             <AnswerBody text={message.content} onCiteClick={handleCiteClick} />
+            {message.pending && (
+              <span className="mt-2 inline-block h-4 w-0.5 animate-pulse bg-accent" aria-label="Réponse en cours" />
+            )}
             {message.sources && message.sources.length > 0 && (
               <SourceList sources={message.sources} lang={lang} activeIndex={activeSource} />
             )}

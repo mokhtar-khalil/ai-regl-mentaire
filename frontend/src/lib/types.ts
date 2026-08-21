@@ -15,6 +15,12 @@ export interface AskResponse {
   sources: Source[];
 }
 
+export type AskStreamEvent =
+  | { type: "status"; request_id: string; stage: string }
+  | { type: "delta"; text: string }
+  | { type: "done"; answer: string; sources: Source[]; timings: Record<string, number | null> }
+  | { type: "error"; error: string };
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

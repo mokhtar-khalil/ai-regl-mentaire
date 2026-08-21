@@ -14,6 +14,9 @@
 # Required env vars on the api service:
 #   GEMINI_API_KEY   — same key used locally
 #   QDRANT_URL       — the Qdrant service's internal Railway URL (http://<service>.railway.internal:6333)
+# Optional env var on the api service:
+#   QDRANT_KEEPALIVE_SECONDS — remote collection ping interval; defaults to
+#   240 seconds in production, set to 0 to disable it.
 #
 # Required env var on the Vercel project:
 #   RAG_API_URL      — this service's public Railway domain

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChatMessage, AskResponse, Conversation } from "@/lib/types";
+import { ChatMessage, AskStreamEvent, Conversation } from "@/lib/types";
 import { detectLang } from "@/lib/lang";
 import { loadConversations, saveConversations, titleFromMessage } from "@/lib/storage";
 import { MessageBubble } from "./MessageBubble";
@@ -113,22 +113,66 @@ export function ChatApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, top_k: 7, target_lang: targetLang }),
       });
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || "Erreur inconnue");
       }
+      if (!res.body) throw new Error("Le serveur n'a retourné aucun flux");
 
-      const answer = data as AskResponse;
-      updateConversation(conversationId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === pendingId
-            ? { ...m, content: answer.answer, sources: answer.sources, lang: detectLang(answer.answer), pending: false }
-            : m
-        ),
-        updatedAt: Date.now(),
-      }));
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let completed = false;
+
+      const applyEvent = (event: AskStreamEvent) => {
+        if (event.type === "delta") {
+          updateConversation(conversationId, (c) => ({
+            ...c,
+            messages: c.messages.map((m) =>
+              m.id === pendingId
+                ? {
+                    ...m,
+                    content: m.content + event.text,
+                    lang: detectLang(m.content + event.text),
+                  }
+                : m
+            ),
+            updatedAt: Date.now(),
+          }));
+        } else if (event.type === "done") {
+          completed = true;
+          updateConversation(conversationId, (c) => ({
+            ...c,
+            messages: c.messages.map((m) =>
+              m.id === pendingId
+                ? {
+                    ...m,
+                    content: event.answer,
+                    sources: event.sources,
+                    lang: detectLang(event.answer),
+                    pending: false,
+                  }
+                : m
+            ),
+            updatedAt: Date.now(),
+          }));
+        } else if (event.type === "error") {
+          throw new Error(event.error);
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.trim()) applyEvent(JSON.parse(line) as AskStreamEvent);
+        }
+        if (done) break;
+      }
+      if (buffer.trim()) applyEvent(JSON.parse(buffer) as AskStreamEvent);
+      if (!completed) throw new Error("Le flux s'est interrompu avant la fin de la réponse");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
       updateConversation(conversationId, (c) => ({

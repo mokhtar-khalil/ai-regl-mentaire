@@ -35,7 +35,11 @@ model_list:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/LITELLM_DATABASE_URL
+  # Disabled again — isolating one variable at a time. The previous test
+  # re-enabled this AND the OpenAI models in the same push, so when it
+  # crashed again after OPENAI_API_KEY was added, it was impossible to
+  # tell which of the two was responsible. Testing OpenAI alone first.
+  # database_url: os.environ/LITELLM_DATABASE_URL
   store_model_in_db: false
 
 litellm_settings:

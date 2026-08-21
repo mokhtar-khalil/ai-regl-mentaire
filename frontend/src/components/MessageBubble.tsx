@@ -57,7 +57,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     <div className="flex justify-start">
       <div
         dir={dir}
-        className={`max-w-[85%] rounded-2xl rounded-bl-sm border px-4 py-3 text-[14.5px] ${
+        className={`max-w-[94%] rounded-2xl rounded-bl-sm border px-5 py-4 text-[14.5px] leading-relaxed sm:max-w-[88%] ${
           message.error ? "border-danger-soft bg-danger-soft text-danger" : "border-line bg-surface text-ink"
         }`}
       >

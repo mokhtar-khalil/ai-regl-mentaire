@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from dotenv import load_dotenv
 
 load_dotenv(".env")
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.documents import label_for
 from app.embeddings import embed_query
@@ -21,8 +22,8 @@ app = FastAPI(title="RégleMarchés AI API")
 
 class AskRequest(BaseModel):
     question: str
-    top_k: int = 10
-    target_lang: str | None = None  # "fr" | "ar" | None (match the question's language)
+    top_k: int = Field(default=7, ge=1, le=8)
+    target_lang: Literal["fr", "ar"] | None = None
 
 
 class Source(BaseModel):
@@ -50,22 +51,58 @@ def health():
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 
 
+def _source_identity(chunk: dict) -> tuple:
+    """Identify one user-visible legal provision across split text chunks."""
+    article_num = chunk.get("article_num")
+    if article_num:
+        # Numbered paragraphs in development-bank documents restart inside
+        # each chapter, unlike globally unique BCM article numbers.
+        if "." in str(article_num):
+            return chunk.get("document"), chunk.get("chapter"), str(article_num)
+        return chunk.get("document"), str(article_num)
+    return chunk.get("document"), chunk.get("page_start"), chunk.get("page_end")
+
+
+def _renumber_citations(response_text: str, chunks: list[dict]) -> tuple[str, list[int]]:
+    """Keep valid citations, merge duplicate provisions and number them contiguously."""
+    raw_indices = [
+        index
+        for index in dict.fromkeys(int(n) for n in _CITATION_RE.findall(response_text))
+        if 1 <= index <= len(chunks)
+    ]
+    cited_indices: list[int] = []
+    visible_by_source: dict[tuple, int] = {}
+    mapping: dict[int, int] = {}
+
+    for original_index in raw_indices:
+        identity = _source_identity(chunks[original_index - 1])
+        visible_index = visible_by_source.get(identity)
+        if visible_index is None:
+            cited_indices.append(original_index)
+            visible_index = len(cited_indices)
+            visible_by_source[identity] = visible_index
+        mapping[original_index] = visible_index
+
+    def replace(match: re.Match) -> str:
+        old = int(match.group(1))
+        return f"[{mapping[old]}]" if old in mapping else ""
+
+    normalized = _CITATION_RE.sub(replace, response_text)
+    normalized = re.sub(r"(\[\d+\])(?:\1)+", r"\1", normalized)
+    normalized = re.sub(r"\s+([.,;:!?])", r"\1", normalized)
+    return normalized, cited_indices
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
     query_vector = embed_query(req.question)
     chunks = hybrid_search(req.question, query_vector, top_k=req.top_k)
     response_text = answer(req.question, chunks, target_lang=req.target_lang)
-
-    # top_k retrieves a broad candidate pool so the model has enough to work
-    # with (see hybrid_search's docstring) — most of those chunks never end
-    # up cited. Showing all of them as "sources" makes the reader wonder why
-    # a source is listed that the answer never mentions. Keep only the ones
-    # the model actually cited, in the order it cited them.
-    cited_indices = [int(n) for n in dict.fromkeys(_CITATION_RE.findall(response_text))]
+    response_text, cited_indices = _renumber_citations(response_text, chunks)
 
     sources = [
         Source(
-            index=i,
+            index=visible_index,
             document=c.get("document"),
             document_label=label_for(c.get("document")),
             chapter=c.get("chapter"),
@@ -75,7 +112,7 @@ def ask(req: AskRequest):
             page_end=c.get("page_end"),
             rrf_score=c.get("rrf_score"),
         )
-        for i, c in enumerate(chunks, start=1)
-        if i in cited_indices
+        for visible_index, original_index in enumerate(cited_indices, start=1)
+        for c in [chunks[original_index - 1]]
     ]
     return AskResponse(answer=response_text, sources=sources)

@@ -16,7 +16,7 @@ from app.index_store import hybrid_search
 question = sys.argv[1]
 
 query_vector = embed_query(question)
-chunks = hybrid_search(question, query_vector, top_k=6)
+chunks = hybrid_search(question, query_vector, top_k=7)
 
 print(f"--- {len(chunks)} chunks retenus (RRF) ---")
 for c in chunks:

@@ -10,7 +10,7 @@ export const UI_STRINGS = {
     section: "§",
     page: "p.",
     score: "score",
-    sources: "Sources",
+    sources: "Références utilisées",
     noSources: "Aucune source retenue.",
   },
   ar: {
@@ -18,7 +18,7 @@ export const UI_STRINGS = {
     section: "الفقرة",
     page: "ص.",
     score: "درجة الصلة",
-    sources: "المصادر",
+    sources: "المراجع المستخدمة",
     noSources: "لم يتم العثور على مصادر.",
   },
 } as const;

@@ -171,13 +171,39 @@ def lexical_search(query: str, top_k: int = 10) -> list[dict]:
     return [{"score": float(score), **chunk} for chunk, score in ranked if score > 0]
 
 
-def hybrid_search(query: str, query_vector: list[float], top_k: int = 10) -> list[dict]:
+_BILINGUAL_CODE_DOCUMENTS = {"jo_1609_fr", "jo_1609_ar"}
+
+
+def _deduplicate_bilingual_provisions(ranked: list[dict], query_lang: str) -> list[dict]:
+    """Keep one language version when the same Code article ranks twice."""
+    preferred_document = "jo_1609_ar" if query_lang == "ar" else "jo_1609_fr"
+    retained: list[dict] = []
+    positions: dict[tuple[str, str], int] = {}
+
+    for hit in ranked:
+        document = hit.get("document")
+        article_num = hit.get("article_num")
+        if document not in _BILINGUAL_CODE_DOCUMENTS or not article_num:
+            retained.append(hit)
+            continue
+
+        key = ("jo_1609", str(article_num))
+        existing_position = positions.get(key)
+        if existing_position is None:
+            positions[key] = len(retained)
+            retained.append(hit)
+        elif document == preferred_document:
+            retained[existing_position] = hit
+
+    return retained
+
+
+def hybrid_search(query: str, query_vector: list[float], top_k: int = 7) -> list[dict]:
     """Reciprocal Rank Fusion of semantic + lexical results.
 
-    top_k defaults higher than a typical single-fact RAG: legal questions
-    often need several articles at once (e.g. recours gracieux + recours
-    devant le CRDDMB), so under-retrieving silently produces a partial,
-    confidently-worded answer — worse than a slightly noisier context.
+    Seven final candidates preserve enough room for multi-article legal
+    questions without encouraging the answer model to cite a broad set of
+    merely adjacent provisions.
 
     The corpus is bilingual FR/AR. BM25 only ever matches a query against
     same-language text, so an Arabic query's lexical pass is blind to the
@@ -206,5 +232,6 @@ def hybrid_search(query: str, query_vector: list[float], top_k: int = 10) -> lis
             fused[hit["id"]] = fused.get(hit["id"], 0) + 1 / (k + rank + 1)
             by_id.setdefault(hit["id"], hit)
 
-    ranked_ids = sorted(fused, key=fused.get, reverse=True)[:top_k]
-    return [{"rrf_score": fused[i], **by_id[i]} for i in ranked_ids]
+    ranked_ids = sorted(fused, key=fused.get, reverse=True)
+    ranked = [{"rrf_score": fused[i], **by_id[i]} for i in ranked_ids]
+    return _deduplicate_bilingual_provisions(ranked, detect_lang(query))[:top_k]

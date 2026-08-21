@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const upstream = await fetch(`${API_URL}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: body.question, top_k: body.top_k ?? 10, target_lang: body.target_lang ?? null }),
+      body: JSON.stringify({ question: body.question, top_k: body.top_k ?? 7, target_lang: body.target_lang ?? null }),
       signal: AbortSignal.timeout(120_000),
     });
 

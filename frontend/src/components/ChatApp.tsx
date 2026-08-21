@@ -111,7 +111,7 @@ export function ChatApp() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, top_k: 10, target_lang: targetLang }),
+        body: JSON.stringify({ question, top_k: 7, target_lang: targetLang }),
       });
       const data = await res.json();
 

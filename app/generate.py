@@ -17,7 +17,7 @@ GENERATION_MODEL = "gemini-pro-latest"
 _SYSTEM_PROMPT = """Tu es un assistant juridique documentaire. Réponds exclusivement à partir des extraits numérotés fournis dans le contexte. Ta priorité, dans cet ordre, est : fidélité aux sources > complétude de la réponse > élégance rédactionnelle. Une réponse partielle mais parfaitement fondée vaut mieux qu'une réponse complète comportant des suppositions. Tu ne complètes jamais une affirmation juridique avec tes connaissances générales, sauf pour expliquer un sigle ou un terme neutre.
 
 LANGUE — le corpus est bilingue français/arabe
-0. Réponds TOUJOURS dans la langue de la question, quelle que soit la langue des extraits sources. Si la question est posée en arabe et que les extraits pertinents sont en français (ou l'inverse), traduis fidèlement leur contenu dans ta réponse — ne change jamais de langue en cours de réponse, et ne réponds jamais dans la langue des extraits par défaut. Mobilise et cite les extraits pertinents indépendamment de leur langue d'origine : les deux versions (française et arabe) du Code de la Commande Publique par exemple couvrent le même texte, utilise celle qui répond le mieux à la question mais ne te limite pas à une langue de corpus par réflexe.
+0. {language_rule} Quelle que soit la langue des extraits sources, traduis fidèlement leur contenu dans ta réponse — ne change jamais de langue en cours de réponse. Mobilise et cite les extraits pertinents indépendamment de leur langue d'origine : les deux versions (française et arabe) du Code de la Commande Publique par exemple couvrent le même texte, utilise celle qui répond le mieux à la question mais ne te limite pas à une langue de corpus par réflexe.
 
 STRUCTURE — adapte-la à la question, ne l'affiche pas artificiellement en entier si la question est simple
 1. "Réponse" : 2 à 5 phrases qui donnent directement la conclusion juridique principale. Intègre dès cette section les exceptions importantes si elles modifient la règle (ne présente jamais une règle comme absolue puis sa limite plus loin — formule la nuance dans la même phrase). Pas de préambule ("Selon mes recherches...", "D'après les informations disponibles...", "Il est important de noter que...", "Voici la réponse...").
@@ -62,18 +62,31 @@ def _format_context(numbered_chunks: list[tuple[int, dict]]) -> str:
     return "\n\n".join(parts)
 
 
-def answer(question: str, chunks: list[dict]) -> str:
+_NO_CHUNKS_MESSAGE = {
+    "fr": "Aucun extrait pertinent n'a été trouvé dans le corpus indexé pour répondre à cette question.",
+    "ar": "لم يتم العثور على مقتطفات ذات صلة في مجموعة الوثائق المفهرسة للإجابة على هذا السؤال.",
+}
+
+_LANGUAGE_RULES = {
+    None: "Réponds TOUJOURS dans la langue de la question — ne réponds jamais dans la langue des extraits par défaut.",
+    "fr": "Réponds TOUJOURS en français, quelle que soit la langue dans laquelle la question a été posée.",
+    "ar": "أجب دائمًا باللغة العربية، بغض النظر عن اللغة التي طُرح بها السؤال.",
+}
+
+
+def answer(question: str, chunks: list[dict], target_lang: str | None = None) -> str:
     if not chunks:
-        return "Aucun extrait pertinent n'a été trouvé dans le corpus indexé pour répondre à cette question."
+        return _NO_CHUNKS_MESSAGE.get(target_lang, _NO_CHUNKS_MESSAGE["fr"])
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     numbered = list(enumerate(chunks, start=1))
     context = _format_context(numbered)
     prompt = f"Extraits réglementaires :\n\n{context}\n\n---\n\nQuestion : {question}"
+    system_prompt = _SYSTEM_PROMPT.format(language_rule=_LANGUAGE_RULES.get(target_lang, _LANGUAGE_RULES[None]))
 
     resp = client.models.generate_content(
         model=GENERATION_MODEL,
         contents=prompt,
-        config=types.GenerateContentConfig(system_instruction=_SYSTEM_PROMPT, temperature=0.25),
+        config=types.GenerateContentConfig(system_instruction=system_prompt, temperature=0.25),
     )
     return resp.text

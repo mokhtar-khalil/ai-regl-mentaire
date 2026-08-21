@@ -45,7 +45,12 @@ def _tokenize(text: str) -> list[str]:
 def get_qdrant_client() -> QdrantClient:
     qdrant_url = os.environ.get("QDRANT_URL")
     if qdrant_url:
-        return QdrantClient(url=qdrant_url, api_key=os.environ.get("QDRANT_API_KEY"))
+        # qdrant-client defaults port=6333 and applies it even when the URL
+        # has no explicit port, overriding the scheme's implicit port (443
+        # for https) — breaks against a reverse-proxied host like Railway's
+        # public domain, which only exposes 443. port=None lets the URL's
+        # own scheme decide.
+        return QdrantClient(url=qdrant_url, api_key=os.environ.get("QDRANT_API_KEY"), port=None)
     os.makedirs(_QDRANT_PATH, exist_ok=True)
     return QdrantClient(path=_QDRANT_PATH)
 

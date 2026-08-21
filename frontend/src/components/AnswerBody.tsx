@@ -37,9 +37,9 @@ function renderInline(text: string, onCiteClick: (n: number) => void, keyPrefix:
           key={`${keyPrefix}-c${counter++}`}
           type="button"
           onClick={() => onCiteClick(n)}
-          className="mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-soft px-1 font-mono text-[10px] font-medium text-accent-ink align-super leading-none hover:bg-accent hover:text-white transition-colors"
+          className="font-mono text-[12.5px] font-medium text-accent hover:underline"
         >
-          {n}
+          [{n}]
         </button>
       );
     }
@@ -59,12 +59,12 @@ export function AnswerBody({ text, onCiteClick }: { text: string; onCiteClick: (
         const headingMatch = trimmed.match(/^\*\*(.+?):?\*\*$/);
         if (headingMatch && trimmed.length < 80) {
           return (
-            <p
+            <h3
               key={i}
-              className="mb-1.5 mt-3 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent first:mt-0"
+              className="mb-2 mt-5 border-b border-line pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-accent first:mt-0"
             >
               {headingMatch[1]}
-            </p>
+            </h3>
           );
         }
 

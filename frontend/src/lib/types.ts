@@ -24,3 +24,10 @@ export interface ChatMessage {
   pending?: boolean;
   error?: string;
 }
+
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: number;
+}

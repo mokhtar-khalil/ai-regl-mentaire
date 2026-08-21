@@ -17,7 +17,7 @@ const publicSans = Public_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "RAG Réglementaire",
+  title: "RégleMarchés AI",
   description: "Assistant juridique documentaire — marchés publics BCM, Code de la Commande Publique, Banque Mondiale.",
 };
 

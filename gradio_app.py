@@ -1,4 +1,4 @@
-"""Gradio front-end for the RAG Réglementaire API.
+"""Gradio front-end for the RégleMarchés AI API.
 
 Talks to the FastAPI backend over HTTP (app/main.py) — start that first:
   PYTHONPATH=. .venv/bin/uvicorn app.main:app --port 8000
@@ -71,8 +71,8 @@ def ask(question: str, top_k: int):
     return gr.update(value=data["answer"], rtl=is_rtl), gr.update(value=sources_md, rtl=is_rtl)
 
 
-with gr.Blocks(title="RAG Réglementaire — test") as demo:
-    gr.Markdown("# RAG Réglementaire — banc de test\nAppelle l'API FastAPI (`/ask`) : retrieval hybride + génération sourcée.")
+with gr.Blocks(title="RégleMarchés AI — test") as demo:
+    gr.Markdown("# RégleMarchés AI — banc de test\nAppelle l'API FastAPI (`/ask`) : retrieval hybride + génération sourcée.")
 
     with gr.Row():
         with gr.Column(scale=2):
